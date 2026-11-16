@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VA Time Tracker & Invoice Generator - Emily Grace Alunan</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- html2pdf.js for robust PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        @media print {
+            body { background: white !important; }
+            .no-print { display: none !important; }
+            .print-shadow-none { box-shadow: none !important; border: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-full flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-indigo-900 text-white shadow-md no-print">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600 p-2.5 rounded-xl shadow-inner">
+                    <i class="fa-solid fa-clock-rotate-left text-xl text-indigo-100"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight">VA Time & Invoice Suite</h1>
+                    <p class="text-xs text-indigo-300">Emily Grace Alunan &bull; Client: TekShawn</p>
+                </div>
+            </div>
+            <nav class="flex bg-indigo-950 p-1 rounded-xl border border-indigo-800">
+                <button onclick="switchTab('tracker')" id="btn-tracker" class="px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 bg-indigo-600 text-white shadow">
+                    <i class="fa-solid fa-stopwatch mr-2"></i>Time Tracker
+                </button>
+                <button onclick="switchTab('invoice')" id="btn-invoice" class="px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 text-indigo-300 hover:text-white">
+                    <i class="fa-solid fa-file-invoice-dollar mr-2"></i>Invoice Generator
+                </button>
+                <button onclick="switchTab('settings')" id="btn-settings" class="px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 text-indigo-300 hover:text-white">
+                    <i class="fa-solid fa-gear mr-2"></i>Settings
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 overflow-y-auto">
+
+        <!-- ================= TAB 1: TIME TRACKER ================= -->
+        <div id="tab-tracker" class="space-y-6">
+            
+            <!-- Check-In / Check-Out Dashboard Card -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900">Shift Control</h2>
+                    <p class="text-sm text-slate-500 mt-1">Clock in when you start working and clock out when you finish. Cross-midnight shifts are calculated automatically.</p>
+                    <div id="live-status" class="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                        <span class="w-2 h-2 rounded-full bg-slate-400"></span> Status: Ready
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+                    <div id="live-timer" class="text-2xl font-mono font-bold text-indigo-600 hidden">00:00:00</div>
+                    <button id="clock-btn" onclick="toggleClock()" class="w-full sm:w-auto px-8 py-3.5 rounded-xl font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play"></i> Check In
+                    </button>
+                </div>
+            </div>
+
+            <!-- Manual Log Entry & Data Actions -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Manual Add / Edit Form -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 lg:col-span-1">
+                    <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-pen-to-square text-indigo-600"></i> <span id="form-title">Add Work Shift</span>
+                    </h3>
+                    <form id="shift-form" onsubmit="saveShift(event)" class="space-y-4">
+                        <input type="hidden" id="edit-id">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Date</label>
+                            <input type="date" id="shift-date" required class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Start Time</label>
+                            <input type="time" id="shift-start" required class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">End Time (Can be next day)</label>
+                            <input type="time" id="shift-end" required class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        </div>
+                        <div class="flex items-center justify-between pt-2">
+                            <button type="button" id="cancel-edit" onclick="resetShiftForm()" class="hidden px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+                            <button type="submit" class="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-sm transition-all shadow">Save Shift</button>
+                        </div>
+                    </form>
+                    <div class="mt-6 pt-6 border-t border-slate-100 flex gap-2">
+                        <button onclick="loadSampleData()" class="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition">Load Sample Data</button>
+                        <button onclick="clearAllData()" class="py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-lg transition" title="Clear all logs"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+
+                <!-- Shift Logs Table -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 lg:col-span-2 flex flex-col">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-list-check text-indigo-600"></i> Work Logs History
+                        </h3>
+                        <div class="flex items-center gap-2 text-xs">
+                            <span class="text-slate-500">Total Hours Logged:</span>
+                            <span id="total-logged-hours" class="font-bold text-indigo-600 text-sm">0.00 hrs</span>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto flex-grow">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-xs font-semibold text-slate-500 bg-slate-50">
+                                    <th class="p-3 rounded-l-lg">Date</th>
+                                    <th class="p-3">Day</th>
+                                    <th class="p-3">Working Time</th>
+                                    <th class="p-3">Duration</th>
+                                    <th class="p-3 text-right rounded-r-lg">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-table-body" class="text-sm divide-y divide-slate-100">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="no-logs-msg" class="text-center py-12 text-slate-400 text-sm hidden">
+                        <i class="fa-solid fa-folder-open text-3xl mb-2 block text-slate-300"></i>
+                        No work shifts logged yet. Click "Check In" or add a shift manually.
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ================= TAB 2: INVOICE GENERATOR ================= -->
+        <div id="tab-invoice" class="space-y-6 hidden">
+            
+            <!-- Invoice Configuration Toolbar -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 no-print flex flex-col lg:flex-row justify-between items-center gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 w-full lg:w-auto flex-grow">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Invoice #</label>
+                        <input type="text" id="inv-number" value="1139" oninput="updateInvoicePreview()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Hourly Rate ($)</label>
+                        <input type="number" step="0.01" id="inv-rate" value="5.00" oninput="updateInvoicePreview()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Filter Start Date</label>
+                        <input type="date" id="inv-start-date" onchange="updateInvoicePreview()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Filter End Date</label>
+                        <input type="date" id="inv-end-date" onchange="updateInvoicePreview()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 w-full lg:w-auto justify-end">
+                    <button onclick="setLastWeekFilter()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition">Sample Range (Nov 9-13)</button>
+                    <button onclick="downloadPDF()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-sm shadow-md transition flex items-center gap-2 whitespace-nowrap">
+                        <i class="fa-solid fa-download"></i> Download PDF
+                    </button>
+                </div>
+            </div>
+
+            <!-- Printable Invoice Document Template (Exact Match to Sample) -->
+            <div class="flex justify-center">
+                <div id="invoice-printable" class="bg-white w-full max-w-4xl shadow-xl rounded-2xl border border-slate-200 p-8 sm:p-12 text-slate-900 print-shadow-none">
+                    
+                    <!-- Header -->
+                    <div class="flex justify-between items-start border-b border-slate-200 pb-8">
+                        <div>
+                            <h2 class="text-3xl font-extrabold tracking-tight text-slate-900 uppercase">INVOICE</h2>
+                            <p class="text-sm font-semibold text-indigo-600 mt-1">Virtual Assistant Services</p>
+                        </div>
+                        <div class="text-right space-y-1 text-sm">
+                            <p><span class="font-semibold text-slate-600">Invoice #:</span> <span id="p-inv-num">1139</span></p>
+                            <p><span class="font-semibold text-slate-600">Period:</span> <span id="p-inv-period">Nov 09 – Nov 13, 2026</span></p>
+                            <p><span class="font-semibold text-slate-600">Issue Date:</span> <span id="p-inv-issue">Nov 14, 2026</span></p>
+                        </div>
+                    </div>
+
+                    <!-- Billed To & Provider Section -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-8 my-8 text-sm">
+                        <div>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">BILLED TO</h3>
+                            <p class="font-bold text-slate-900 text-base" id="p-client-name">Shawn Fickeisen (TekShawn)</p>
+                            <p class="text-slate-600 mt-1 leading-relaxed" id="p-client-address">5465 Benjamin Ct, Ventura, CA 93003, USA</p>
+                            <p class="text-slate-600 mt-1" id="p-client-phone">Phone: +1 (310) 744-5546</p>
+                        </div>
+                        <div class="sm:text-right">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">SERVICE PROVIDER</h3>
+                            <p class="font-bold text-slate-900 text-base" id="p-provider-name">Emily Grace Alunan</p>
+                            <p class="text-slate-600 mt-1" id="p-provider-title">Personal Virtual Assistant</p>
+                            <p class="text-slate-600 mt-1" id="p-provider-email">emilygracea4635@gmail.com</p>
+                        </div>
+                    </div>
+
+                    <!-- Detailed Work Hours Breakdown -->
+                    <div class="mb-8">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">DETAILED WORK HOURS BREAKDOWN</h3>
+                        <div class="border border-slate-200 rounded-xl overflow-hidden">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                                    <tr>
+                                        <th class="p-3.5 font-semibold">Date</th>
+                                        <th class="p-3.5 font-semibold">Day</th>
+                                        <th class="p-3.5 font-semibold">Working Time</th>
+                                        <th class="p-3.5 font-semibold text-right">Duration</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="p-hours-tbody" class="divide-y divide-slate-100">
+                                    <!-- Injected rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Services & Charges -->
+                    <div class="mb-8">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">SERVICES & CHARGES</h3>
+                        <div class="border border-slate-200 rounded-xl overflow-hidden">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                                    <tr>
+                                        <th class="p-3.5 font-semibold w-16">SI.</th>
+                                        <th class="p-3.5 font-semibold">Description</th>
+                                        <th class="p-3.5 font-semibold text-center">Rate/Hr</th>
+                                        <th class="p-3.5 font-semibold text-center">Total Hours</th>
+                                        <th class="p-3.5 font-semibold text-right">Total Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <tr>
+                                        <td class="p-3.5 text-slate-500 font-medium">1</td>
+                                        <td class="p-3.5 font-medium text-slate-900">
+                                            TekShawn (Personal VA Services)
+                                            <div class="text-xs text-slate-500 font-normal" id="p-range-desc">Weekly hours worked</div>
+                                        </td>
+                                        <td class="p-3.5 text-center text-slate-700" id="p-disp-rate">$5.00</td>
+                                        <td class="p-3.5 text-center text-slate-700 font-medium" id="p-total-hours">0.00 hrs</td>
+                                        <td class="p-3.5 text-right font-bold text-slate-900" id="p-total-amount">$0.00</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Payment Instructions & Summary Box -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-slate-200 items-start">
+                        <div class="space-y-3 text-sm">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">PAYMENT INSTRUCTIONS</h3>
+                            <p class="text-slate-700"><strong class="text-slate-900">Payment Method:</strong> <span id="p-pay-method">Remitly Only</span></p>
+                            <p class="text-slate-700"><strong class="text-slate-900">Recipient:</strong> <span id="p-pay-recipient">Emily Grace Alunan</span></p>
+                            <p class="text-slate-700">
+                                <strong class="text-slate-900">Payment Link:</strong><br>
+                                <a href="https://remit.ly/pay/emilygracea4635" target="_blank" id="p-pay-link" class="text-indigo-600 hover:underline break-all">https://remit.ly/pay/emilygracea4635</a>
+                            </p>
+                            <p class="text-xs text-slate-500 pt-2">You can complete payment directly using the Remitly link above. Thank you for your business!</p>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-3 text-sm">
+                            <div class="flex justify-between text-slate-600">
+                                <span>Total Time Worked:</span>
+                                <span id="p-summary-time" class="font-semibold text-slate-900">0 hrs 0 mins (0.00 hrs)</span>
+                            </div>
+                            <div class="flex justify-between text-base font-bold pt-3 border-t border-slate-200 text-slate-900">
+                                <span>Total Amount Due:</span>
+                                <span id="p-summary-amount" class="text-indigo-600">$0.00 USD</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Note inside invoice -->
+                    <div class="mt-12 pt-6 border-t border-slate-100 flex justify-between text-xs text-slate-400">
+                        <span>Invoice #<span id="p-footer-num">1139</span> - Emily Grace Alunan</span>
+                        <span>Page 1 of 1</span>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ================= TAB 3: SETTINGS ================= -->
+        <div id="tab-settings" class="space-y-6 hidden">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-3xl mx-auto space-y-6">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900 mb-1">Invoice & Profile Customization</h3>
+                    <p class="text-sm text-slate-600">Customize your provider details, client information, and payment instructions below. Changes apply instantly to the invoice.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+                    <!-- Service Provider Info -->
+                    <div class="space-y-4">
+                        <h4 class="font-bold text-sm text-indigo-900 uppercase tracking-wide">Service Provider (You)</h4>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Your Name</label>
+                            <input type="text" id="set-provider-name" value="Emily Grace Alunan" oninput="saveSettings()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Your Title / Role</label>
+                            <input type="text" id="set-provider-title" value="Personal Virtual Assistant" oninput="saveSettings()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Your Email</label>
+                            <input type="email" id="set-provider-email" value="emilygracea4635@gmail.com" oninput="saveSettings()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                        </div>
+                    </div>
+
+                    <!-- Billed To Info -->
+                    <div class="space-y-4">
+                        <h4 class="font-bold text-sm text-indigo-900 uppercase tracking-wide">Billed To (Client)</h4>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Client Name & Company</label>
+                            <input type="text" id="set-client-name" value="Shawn Fickeisen (TekShawn)" oninput="saveSettings()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Client Address</label>
+                            <input type="text" id="set-client-address" value="5465 Benjamin Ct, Ventura, CA 93003, USA" oninput="saveSettings()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Client Phone</label>
+                            <input type="text" id="set-client-phone" value="+1 (310) 744-5546" oninput="saveSettings()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Instructions -->
+                <div class="space-y-4 pt-4 border-t border-slate-100">
+                    <h4 class="font-bold text-sm text-indigo-900 uppercase tracking-wide">Payment Instructions</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Payment Method</label>
+                            <input type="text" id="set-pay-method" value="Remitly Only" oninput="saveSettings()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Payment Link URL</label>
+                            <input type="text" id="set-pay-link" value="https://remit.ly/pay/emilygracea4635" oninput="saveSettings()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Management -->
+                <div class="space-y-4 pt-4 border-t border-slate-100">
+                    <h4 class="font-bold text-sm text-slate-900 uppercase tracking-wide">Data Backup & Reset</h4>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="exportDataJSON()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition">Export Shifts JSON</button>
+                        <label class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition cursor-pointer">
+                            Import Shifts JSON <input type="file" accept=".json" onchange="importDataJSON(event)" class="hidden">
+                        </label>
+                        <button onclick="resetToDefaults()" class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-lg transition ml-auto">Reset Sample Data</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Custom Notification Toast Modal -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-xl text-sm flex items-center gap-3">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toast-msg">Action completed successfully.</span>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // --- Tab Switching Logic ---
+        function switchTab(tabId) {
+            // Hide all tabs
+            document.getElementById('tab-tracker').classList.add('hidden');
+            document.getElementById('tab-invoice').classList.add('hidden');
+            document.getElementById('tab-settings').classList.add('hidden');
+
+            // Reset all tab buttons style
+            document.getElementById('btn-tracker').className = "px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 text-indigo-300 hover:text-white";
+            document.getElementById('btn-invoice').className = "px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 text-indigo-300 hover:text-white";
+            document.getElementById('btn-settings').className = "px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 text-indigo-300 hover:text-white";
+
+            // Show selected tab and highlight button
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            document.getElementById('btn-' + tabId).className = "px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 bg-indigo-600 text-white shadow";
+
+            if (tabId === 'invoice') {
+                updateInvoicePreview();
+            }
+        }
+
+        // --- State Management ---
+        let shifts = JSON.parse(localStorage.getItem('va_shifts')) || [];
+        let activeTimer = JSON.parse(localStorage.getItem('va_active_timer')) || null;
+        let timerInterval = null;
+
+        // Settings State
+        let settings = JSON.parse(localStorage.getItem('va_settings')) || {
+            providerName: "Emily Grace Alunan",
+            providerTitle: "Personal Virtual Assistant",
+            providerEmail: "emilygracea4635@gmail.com",
+            clientName: "Shawn Fickeisen (TekShawn)",
+            clientAddress: "5465 Benjamin Ct, Ventura, CA 93003, USA",
+            clientPhone: "+1 (310) 744-5546",
+            payMethod: "Remitly Only",
+            payLink: "https://remit.ly/pay/emilygracea4635"
+        };
+
+        // Sample data matching the prompt's reference invoice
+        const sampleShifts = [
+            { id: '1', date: '2026-11-09', start: '8:30 PM', end: '12:18 AM', nextDay: true, durationMinutes: 228 },
+            { id: '2', date: '2026-11-10', start: '9:03 PM', end: '5:00 AM', nextDay: true, durationMinutes: 477 },
+            { id: '3', date: '2026-11-11', start: '7:30 PM', end: '6:05 AM', nextDay: true, durationMinutes: 635 },
+            { id: '4', date: '2026-11-12', start: '7:30 PM', end: '3:30 AM', nextDay: true, durationMinutes: 480 }
+        ];
+
+        window.onload = function() {
+            if (shifts.length === 0) {
+                shifts = sampleShifts;
+                saveShiftsToStorage();
+            }
+
+            // Initialize settings inputs
+            document.getElementById('set-provider-name').value = settings.providerName;
+            document.getElementById('set-provider-title').value = settings.providerTitle;
+            document.getElementById('set-provider-email').value = settings.providerEmail;
+            document.getElementById('set-client-name').value = settings.clientName;
+            document.getElementById('set-client-address').value = settings.clientAddress;
+            document.getElementById('set-client-phone').value = settings.clientPhone;
+            document.getElementById('set-pay-method').value = settings.payMethod;
+            document.getElementById('set-pay-link').value = settings.payLink;
+
+            // Initialize default dates for invoice filter to cover Nov 09 - Nov 13
+            document.getElementById('inv-start-date').value = '2026-11-09';
+            document.getElementById('inv-end-date').value = '2026-11-13';
+
+            renderLogs();
+            updateInvoicePreview();
+
+            if (activeTimer) {
+                startTimerTicker();
+                updateClockButtonState(true);
+            }
+        };
+
+        function saveSettings() {
+            settings.providerName = document.getElementById('set-provider-name').value;
+            settings.providerTitle = document.getElementById('set-provider-title').value;
+            settings.providerEmail = document.getElementById('set-provider-email').value;
+            settings.clientName = document.getElementById('set-client-name').value;
+            settings.clientAddress = document.getElementById('set-client-address').value;
+            settings.clientPhone = document.getElementById('set-client-phone').value;
+            settings.payMethod = document.getElementById('set-pay-method').value;
+            settings.payLink = document.getElementById('set-pay-link').value;
+
+            localStorage.setItem('va_settings', JSON.stringify(settings));
+            updateInvoicePreview();
+        }
+
+        function resetToDefaults() {
+            if (confirm("Reset shifts and settings to sample defaults?")) {
+                shifts = sampleShifts;
+                saveShiftsToStorage();
+                localStorage.removeItem('va_settings');
+                location.reload();
+            }
+        }
+
+        // --- Clock In / Out Logic ---
+        function toggleClock() {
+            if (!activeTimer) {
+                // Check In
+                const now = new Date();
+                activeTimer = {
+                    startTime: now.getTime(),
+                    date: now.toISOString().split('T')[0],
+                    startFormatted: formatTime12hr(now)
+                };
+                localStorage.setItem('va_active_timer', JSON.stringify(activeTimer));
+                startTimerTicker();
+                updateClockButtonState(true);
+                showToast("Checked in successfully!");
+            } else {
+                // Check Out
+                const now = new Date();
+                const endTimeStr = formatTime12hr(now);
+                const endDateStr = now.toISOString().split('T')[0];
+                
+                // Calculate if end time crossed midnight relative to start date
+                const startDateObj = new Date(activeTimer.date + 'T' + convert12to24(activeTimer.startFormatted));
+                let endDateObj = new Date(endDateStr + 'T' + now.toTimeString().split(' ')[0]);
+                
+                let nextDay = endDateObj < startDateObj;
+                if (nextDay && endDateObj.getDate() === startDateObj.getDate()) {
+                    endDateObj.setDate(endDateObj.getDate() + 1);
+                }
+
+                const diffMs = endDateObj - startDateObj;
+                const totalMins = Math.round(diffMs / 60000);
+                const hours = Math.floor(totalMins / 60);
+                const mins = totalMins % 60;
+
+                const newShift = {
+                    id: Date.now().toString(),
+                    date: activeTimer.date,
+                    start: activeTimer.startFormatted,
+                    end: endTimeStr,
+                    nextDay: nextDay,
+                    durationMinutes: totalMins
+                };
+
+                shifts.push(newShift);
+                saveShiftsToStorage();
+
+                // Clear active timer
+                localStorage.removeItem('va_active_timer');
+                activeTimer = null;
+                clearInterval(timerInterval);
+                document.getElementById('live-timer').classList.add('hidden');
+                updateClockButtonState(false);
+                renderLogs();
+                showToast("Checked out and shift saved!");
+            }
+        }
+
+        function startTimerTicker() {
+            const timerEl = document.getElementById('live-timer');
+            timerEl.classList.remove('hidden');
+            
+            if (timerInterval) clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                const elapsed = Date.now() - activeTimer.startTime;
+                const totalSecs = Math.floor(elapsed / 1000);
+                const hrs = Math.floor(totalSecs / 3600).toString().padStart(2, '0');
+                const mins = Math.floor((totalSecs % 3600) / 60).toString().padStart(2, '0');
+                const secs = (totalSecs % 60).toString().padStart(2, '0');
+                timerEl.innerText = `${hrs}:${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function updateClockButtonState(isCheckedIn) {
+            const btn = document.getElementById('clock-btn');
+            const statusEl = document.getElementById('live-status');
+            if (isCheckedIn) {
+                btn.className = "w-full sm:w-auto px-8 py-3.5 rounded-xl font-semibold text-white bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all transform active:scale-95 flex items-center justify-center gap-2";
+                btn.innerHTML = `<i class="fa-solid fa-square"></i> Check Out`;
+                statusEl.className = "mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700";
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Status: Checked In at ${activeTimer.startFormatted}`;
+            } else {
+                btn.className = "w-full sm:w-auto px-8 py-3.5 rounded-xl font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 transition-all transform active:scale-95 flex items-center justify-center gap-2";
+                btn.innerHTML = `<i class="fa-solid fa-play"></i> Check In`;
+                statusEl.className = "mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600";
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span> Status: Ready`;
+            }
+        }
+
+        // --- Shift Management (CRUD) ---
+        function saveShift(event) {
+            event.preventDefault();
+            const editId = document.getElementById('edit-id').value;
+            const date = document.getElementById('shift-date').value;
+            const startTimeInput = document.getElementById('shift-start').value;
+            const endTimeInput = document.getElementById('shift-end').value;
+
+            // Format times to 12hr representation for consistent display
+            const start12 = formatTime12hrFromInput(startTimeInput);
+            const end12 = formatTime12hrFromInput(endTimeInput);
+
+            // Calculate duration in minutes
+            const startDateTime = new Date(`${date}T${startTimeInput}`);
+            let endDateTime = new Date(`${date}T${endTimeInput}`);
+            let nextDay = endDateTime < startDateTime;
+            if (nextDay) {
+                endDateTime.setDate(endDateTime.getDate() + 1);
+            }
+            const diffMs = endDateTime - startDateTime;
+            const totalMins = Math.round(diffMs / 60000);
+
+            if (editId) {
+                // Update
+                const idx = shifts.findIndex(s => s.id === editId);
+                if (idx !== -1) {
+                    shifts[idx] = { id: editId, date, start: start12, end: end12, nextDay, durationMinutes: totalMins };
+                }
+                showToast("Shift updated successfully!");
+            } else {
+                // Create
+                const newShift = {
+                    id: Date.now().toString(),
+                    date,
+                    start: start12,
+                    end: end12,
+                    nextDay,
+                    durationMinutes: totalMins
+                };
+                shifts.push(newShift);
+                showToast("Shift added successfully!");
+            }
+
+            saveShiftsToStorage();
+            resetShiftForm();
+            renderLogs();
+        }
+
+        function editShift(id) {
+            const shift = shifts.find(s => s.id === id);
+            if (!shift) return;
+
+            document.getElementById('edit-id').value = shift.id;
+            document.getElementById('shift-date').value = shift.date;
+            document.getElementById('shift-start').value = convert12to24(shift.start);
+            document.getElementById('shift-end').value = convert12to24(shift.end);
+            
+            document.getElementById('form-title').innerText = "Edit Work Shift";
+            document.getElementById('cancel-edit').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function deleteShift(id) {
+            if (confirm("Are you sure you want to delete this shift log?")) {
+                shifts = shifts.filter(s => s.id !== id);
+                saveShiftsToStorage();
+                renderLogs();
+                showToast("Shift deleted.");
+            }
+        }
+
+        function resetShiftForm() {
+            document.getElementById('shift-form').reset();
+            document.getElementById('edit-id').value = '';
+            document.getElementById('form-title').innerText = "Add Work Shift";
+            document.getElementById('cancel-edit').classList.add('hidden');
+        }
+
+        function loadSampleData() {
+            shifts = sampleShifts;
+            saveShiftsToStorage();
+            renderLogs();
+            document.getElementById('inv-start-date').value = '2026-11-09';
+            document.getElementById('inv-end-date').value = '2026-11-13';
+            updateInvoicePreview();
+            showToast("Sample data loaded!");
+        }
+
+        function clearAllData() {
+            if (confirm("Clear all logged shifts? This cannot be undone.")) {
+                shifts = [];
+                saveShiftsToStorage();
+                renderLogs();
+                showToast("All data cleared.");
+            }
+        }
+
+        function saveShiftsToStorage() {
+            localStorage.setItem('va_shifts', JSON.stringify(shifts));
+        }
+
+        // --- Helper Formatting Utilities ---
+        function formatTime12hr(dateObj) {
+            let hours = dateObj.getHours();
+            let minutes = dateObj.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            return `${hours}:${minutes} ${ampm}`;
+        }
+
+        function formatTime12hrFromInput(timeStr) {
+            if (!timeStr) return '';
+            const [h, m] = timeStr.split(':');
+            let hours = parseInt(h, 10);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            return `${hours}:${m} ${ampm}`;
+        }
+
+        function convert12to24(time12) {
+            if (!time12) return '00:00';
+            const parts = time12.split(' ');
+            if (parts.length < 2) return time12;
+            const [h, m] = parts[0].split(':');
+            let hours = parseInt(h, 10);
+            const ampm = parts[1];
+            if (ampm === 'PM' && hours < 12) hours += 12;
+            if (ampm === 'AM' && hours === 12) hours = 0;
+            return `${hours.toString().padStart(2, '0')}:${m}`;
+        }
+
+        function getDayName(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            return date.toLocaleDateString('en-US', { weekday: 'long' });
+        }
+
+        function formatDateReadable(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+        }
+
+        function calculateDurationMinutes(shift) {
+            if (shift.durationMinutes) return shift.durationMinutes;
+            // Fallback calculation
+            const start24 = convert12to24(shift.start);
+            const end24 = convert12to24(shift.end);
+            const startObj = new Date(`${shift.date}T${start24}`);
+            let endObj = new Date(`${shift.date}T${end24}`);
+            if (shift.nextDay || endObj < startObj) {
+                endObj.setDate(endObj.getDate() + 1);
+            }
+            return Math.round((endObj - startObj) / 60000);
+        }
+
+        function formatDurationText(totalMins) {
+            const hrs = Math.floor(totalMins / 60);
+            const mins = totalMins % 60;
+            const decimalHrs = (totalMins / 60).toFixed(2);
+            return `${hrs} hrs ${mins} mins (${decimalHrs} hrs)`;
+        }
+
+        function formatDurationShort(totalMins) {
+            const hrs = Math.floor(totalMins / 60);
+            const mins = totalMins % 60;
+            const decimalHrs = (totalMins / 60).toFixed(2);
+            return `${hrs} hrs ${mins.toString().padStart(2,'0')} mins (${decimalHrs} hrs)`;
+        }
+
+        // --- Render UI ---
+        function renderLogs() {
+            const tbody = document.getElementById('logs-table-body');
+            const noMsg = document.getElementById('no-logs-msg');
+            tbody.innerHTML = '';
+
+            if (shifts.length === 0) {
+                noMsg.classList.remove('hidden');
+                document.getElementById('total-logged-hours').innerText = '0.00 hrs';
+                return;
+            }
+            noMsg.classList.add('hidden');
+
+            // Sort shifts by date descending
+            const sorted = [...shifts].sort((a,b) => new Date(b.date) - new Date(a.date));
+            let totalMinsAll = 0;
+
+            sorted.forEach(shift => {
+                const mins = calculateDurationMinutes(shift);
+                totalMinsAll += mins;
+                const dayName = getDayName(shift.date);
+                const formattedDate = formatDateReadable(shift.date);
+                const workingTimeStr = shift.nextDay ? `${shift.start} – ${shift.end} (Next Day)` : `${shift.start} – ${shift.end}`;
+                const durationStr = formatDurationText(mins);
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition border-b border-slate-100 last:border-0";
+                tr.innerHTML = `
+                    <td class="p-3 font-medium text-slate-900">${formattedDate}</td>
+                    <td class="p-3 text-slate-600">${dayName}</td>
+                    <td class="p-3 text-slate-700 font-mono text-xs">${workingTimeStr}</td>
+                    <td class="p-3 text-indigo-600 font-medium">${durationStr}</td>
+                    <td class="p-3 text-right space-x-2">
+                        <button onclick="editShift('${shift.id}')" class="text-slate-400 hover:text-indigo-600 p-1" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteShift('${shift.id}')" class="text-slate-400 hover:text-rose-600 p-1" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('total-logged-hours').innerText = (totalMinsAll / 60).toFixed(2) + ' hrs';
+        }
+
+        // --- Invoice Preview & Calculation ---
+        function updateInvoicePreview() {
+            const invNum = document.getElementById('inv-number').value || '1139';
+            const rate = parseFloat(document.getElementById('inv-rate').value) || 5.00;
+            const startDate = document.getElementById('inv-start-date').value;
+            const endDate = document.getElementById('inv-end-date').value;
+
+            document.getElementById('p-inv-num').innerText = invNum;
+            document.getElementById('p-footer-num').innerText = invNum;
+            document.getElementById('p-disp-rate').innerText = `$${rate.toFixed(2)}`;
+
+            // Render dynamic provider & client info from settings
+            document.getElementById('p-provider-name').innerText = settings.providerName;
+            document.getElementById('p-provider-title').innerText = settings.providerTitle;
+            document.getElementById('p-provider-email').innerText = settings.providerEmail;
+            
+            document.getElementById('p-client-name').innerText = settings.clientName;
+            document.getElementById('p-client-address').innerText = settings.clientAddress;
+            document.getElementById('p-client-phone').innerText = `Phone: ${settings.clientPhone}`;
+
+            document.getElementById('p-pay-method').innerText = settings.payMethod;
+            document.getElementById('p-pay-recipient').innerText = settings.providerName;
+            const payLinkEl = document.getElementById('p-pay-link');
+            payLinkEl.href = settings.payLink;
+            payLinkEl.innerText = settings.payLink;
+
+            // Issue Date = Today formatted
+            const todayStr = new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+            document.getElementById('p-inv-issue').innerText = todayStr;
+
+            // Filter shifts based on date inputs
+            let filtered = [...shifts];
+            if (startDate && endDate) {
+                filtered = filtered.filter(s => s.date >= startDate && s.date <= endDate);
+            }
+            filtered.sort((a,b) => new Date(a.date) - new Date(b.date));
+
+            if (startDate && endDate) {
+                const startObj = new Date(startDate + 'T00:00:00');
+                const endObj = new Date(endDate + 'T00:00:00');
+                const startFmt = startObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                const endFmt = endObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                document.getElementById('p-inv-period').innerText = `${startFmt} – ${endFmt}`;
+                document.getElementById('p-range-desc').innerText = `Hours worked: ${startFmt} – ${endFmt}`;
+            } else if (filtered.length > 0) {
+                const firstDateObj = new Date(filtered[0].date + 'T00:00:00');
+                const lastShift = filtered[filtered.length - 1];
+                let lastDateObj = new Date(lastShift.date + 'T00:00:00');
+                if (lastShift.nextDay) {
+                    lastDateObj.setDate(lastDateObj.getDate() + 1);
+                }
+                const firstStr = firstDateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                const lastStr = lastDateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                document.getElementById('p-inv-period').innerText = `${firstStr} – ${lastStr}`;
+                document.getElementById('p-range-desc').innerText = `Hours worked: ${firstStr} – ${lastStr}`;
+            } else {
+                document.getElementById('p-inv-period').innerText = 'No period selected';
+                document.getElementById('p-range-desc').innerText = 'Hours worked';
+            }
+
+            const tbody = document.getElementById('p-hours-tbody');
+            tbody.innerHTML = '';
+
+            let totalMins = 0;
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">No work hours logged for this date range.</td></tr>`;
+            } else {
+                filtered.forEach(shift => {
+                    const mins = calculateDurationMinutes(shift);
+                    totalMins += mins;
+                    const formattedDate = formatDateReadable(shift.date);
+                    const dayName = getDayName(shift.date);
+                    
+                    let workingTimeFormatted = `${shift.start} ${shift.end}`;
+                    if (shift.nextDay) {
+                        const nextDateObj = new Date(shift.date + 'T00:00:00');
+                        nextDateObj.setDate(nextDateObj.getDate() + 1);
+                        const nextDayShort = nextDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        workingTimeFormatted = `${shift.start} ${shift.end} (${nextDayShort})`;
+                    }
+
+                    const tr = document.createElement('tr');
+                    tr.className = "border-b border-slate-100 last:border-0";
+                    tr.innerHTML = `
+                        <td class="p-3.5 font-medium text-slate-900">${formattedDate}</td>
+                        <td class="p-3.5 text-slate-600">${dayName}</td>
+                        <td class="p-3.5 text-slate-700 font-mono text-xs">${workingTimeFormatted}</td>
+                        <td class="p-3.5 text-right text-indigo-600 font-medium">${formatDurationShort(mins)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            const totalHoursDec = totalMins / 60;
+            const totalAmount = totalHoursDec * rate;
+            const hrs = Math.floor(totalMins / 60);
+            const mins = totalMins % 60;
+            const timeText = `${hrs} hrs ${mins} mins (${totalHoursDec.toFixed(2)} hrs)`;
+
+            document.getElementById('p-total-hours').innerText = `${totalHoursDec.toFixed(2)} hrs`;
+            document.getElementById('p-total-amount').innerText = `$${totalAmount.toFixed(2)}`;
+            document.getElementById('p-summary-time').innerText = timeText;
+            document.getElementById('p-summary-amount').innerText = `$${totalAmount.toFixed(2)} USD`;
+        }
+
+        function setLastWeekFilter() {
+            document.getElementById('inv-start-date').value = '2026-11-09';
+            document.getElementById('inv-end-date').value = '2026-11-13';
+            updateInvoicePreview();
+            showToast("Filtered to Nov 09 – Nov 13, 2026");
+        }
+
+        // --- PDF Export using html2pdf.js ---
+        function downloadPDF() {
+            const element = document.getElementById('invoice-printable');
+            const invNum = document.getElementById('inv-number').value || '1139';
+            const opt = {
+                margin:       10,
+                filename:     `Invoice_${invNum}_Emily_Grace_Alunan.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            showToast("Generating PDF invoice...");
+            html2pdf().from(element).set(opt).save().then(() => {
+                showToast("PDF downloaded successfully!");
+            });
+        }
+
+        // --- Data Import/Export Settings ---
+        function exportDataJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(shifts, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "va_work_shifts_backup.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast("Data exported successfully!");
+        }
+
+        function importDataJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (Array.isArray(parsed)) {
+                        shifts = parsed;
+                        saveShiftsToStorage();
+                        renderLogs();
+                        updateInvoicePreview();
+                        showToast("Data imported successfully!");
+                    } else {
+                        alert("Invalid backup file format.");
+                    }
+                } catch (err) {
+                    alert("Error parsing JSON file.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // --- Toast Notification Helper ---
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const msg = document.getElementById('toast-msg');
+            const icon = document.getElementById('toast-icon');
+
+            msg.innerText = message;
+            if (isError) {
+                icon.className = "fa-solid fa-circle-exclamation text-rose-400";
+            } else {
+                icon.className = "fa-solid fa-circle-check text-emerald-400";
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
